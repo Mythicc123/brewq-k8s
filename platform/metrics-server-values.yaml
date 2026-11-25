@@ -1,0 +1,3 @@
+args:
+  # kind kubelets use serving certificates that metrics-server cannot verify.
+  - --kubelet-insecure-tls

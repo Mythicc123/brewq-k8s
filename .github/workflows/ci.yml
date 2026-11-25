@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  HELM_VERSION: v4.3.2
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+          checksum-policy: required
+      - name: Install kubeconform
+        env:
+          KUBECONFORM_VERSION: v0.8.0
+          KUBECONFORM_SHA256: 9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+        run: |
+          mkdir -p .cache/bin
+          archive=.cache/kubeconform-linux-amd64.tar.gz
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "$archive" \
+            "https://github.com/yannh/kubeconform/releases/download/$KUBECONFORM_VERSION/kubeconform-linux-amd64.tar.gz"
+          printf '%s  %s\n' "$KUBECONFORM_SHA256" "$archive" | sha256sum --check
+          tar -xzf "$archive" -C .cache/bin kubeconform
+          echo "$PWD/.cache/bin" >> "$GITHUB_PATH"
+      - run: make lint
+
+  kind-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: azure/setup-helm@v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+          checksum-policy: required
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.33.0
+          kubectl_version: v1.37.0
+          config: kind/cluster.yaml
+          cluster_name: brewq
+          wait: 5m
+      - run: make up
+      - run: make deploy
+      - name: Wait for Traefik to accept the route
+        run: |
+          kubectl --context kind-brewq -n brewq wait httproute/brewq --timeout=60s \
+            --for='jsonpath={.status.parents[0].conditions[?(@.type=="Accepted")].status}=True'
+      - run: make smoke
+      - run: make test

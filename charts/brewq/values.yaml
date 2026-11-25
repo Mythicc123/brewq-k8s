@@ -1,0 +1,28 @@
+image:
+  repository: ghcr.io/mythicc123/brewq-service
+  tag: ""
+  pullPolicy: IfNotPresent
+replicaCount: 2
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+brewSeconds: 20
+chaos:
+  errorRate: "0"
+  latencyMs: "0"
+  leakMbPerMin: "0"
+  crashOnStart: "false"
+httpRoute:
+  enabled: true
+  hostname: brewq.localtest.me
+  parentRefs:
+    - name: edge
+      namespace: traefik
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

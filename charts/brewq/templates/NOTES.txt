@@ -1,0 +1,4 @@
+{{- if .Values.httpRoute.enabled }}
+Check the public route with curl http://{{ .Values.httpRoute.hostname }}/menu
+{{- end }}
+Check the Service with helm test {{ .Release.Name }} -n {{ .Release.Namespace }} --logs

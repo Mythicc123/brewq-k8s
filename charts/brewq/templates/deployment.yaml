@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brewq
+  labels:
+    {{- include "brewq.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "brewq.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "brewq.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: brewq
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 20
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "brewq.selectorLabels" . | nindent 14 }}
+      containers:
+        - name: brewq
+          image: {{ printf "%s:%s" .Values.image.repository (default .Chart.AppVersion .Values.image.tag) | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- include "brewq.containerSecurityContext" . | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: BREW_SECONDS
+              value: {{ .Values.brewSeconds | quote }}
+            - name: CHAOS_ERROR_RATE
+              value: {{ .Values.chaos.errorRate | quote }}
+            - name: CHAOS_LATENCY_MS
+              value: {{ .Values.chaos.latencyMs | quote }}
+            - name: CHAOS_LEAK_MB_PER_MIN
+              value: {{ .Values.chaos.leakMbPerMin | quote }}
+            - name: CHAOS_CRASH_ON_START
+              value: {{ .Values.chaos.crashOnStart | quote }}
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 15
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 2
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

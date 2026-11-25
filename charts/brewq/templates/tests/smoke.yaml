@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: brewq-test
+  labels:
+    {{- include "brewq.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 60
+  serviceAccountName: brewq
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: curl
+      image: curlimages/curl:8.23.0
+      securityContext:
+        {{- include "brewq.containerSecurityContext" . | nindent 8 }}
+      command: ["/bin/sh", "-ec"]
+      args:
+        - |
+          for path in readyz menu; do
+            status="$(curl --silent --show-error --max-time 10 \
+              --write-out '%{http_code}' --output /dev/null "http://brewq/$path")"
+            echo "/$path returned HTTP $status"
+            case "$status" in
+              2[0-9][0-9]) ;;
+              *) exit 1 ;;
+            esac
+          done

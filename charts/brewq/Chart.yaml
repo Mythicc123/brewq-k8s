@@ -1,0 +1,6 @@
+apiVersion: v2
+name: brewq
+description: A small coffee-order service for the Brewq Kubernetes lab
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

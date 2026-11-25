@@ -1,0 +1,27 @@
+providers:
+  kubernetesCRD:
+    enabled: false
+  kubernetesIngress:
+    enabled: false
+  kubernetesGateway:
+    enabled: true
+
+ingressClass:
+  enabled: false
+
+gateway:
+  enabled: false
+
+gatewayClass:
+  enabled: true
+  name: traefik
+
+service:
+  spec:
+    type: NodePort
+ports:
+  web:
+    port: 8000
+    nodePort: 30080
+  websecure:
+    enabled: false
