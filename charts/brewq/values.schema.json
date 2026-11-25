@@ -2,6 +2,14 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
+  "definitions": {
+    "nonNegativeIntegerValue": {
+      "oneOf": [
+        { "type": "string", "pattern": "^[0-9]+$" },
+        { "type": "integer", "minimum": 0 }
+      ]
+    }
+  },
   "required": ["image", "replicaCount", "autoscaling", "brewSeconds", "chaos", "httpRoute", "resources"],
   "properties": {
     "image": {
@@ -32,10 +40,20 @@
       "additionalProperties": false,
       "required": ["errorRate", "latencyMs", "leakMbPerMin", "crashOnStart"],
       "properties": {
-        "errorRate": { "type": "string", "minLength": 1 },
-        "latencyMs": { "type": "string", "pattern": "^[0-9]+$" },
-        "leakMbPerMin": { "type": "string", "pattern": "^[0-9]+$" },
-        "crashOnStart": { "enum": ["true", "false"] }
+        "errorRate": {
+          "oneOf": [
+            { "type": "string", "minLength": 1 },
+            { "type": "number", "minimum": 0, "maximum": 1 }
+          ]
+        },
+        "latencyMs": { "$ref": "#/definitions/nonNegativeIntegerValue" },
+        "leakMbPerMin": { "$ref": "#/definitions/nonNegativeIntegerValue" },
+        "crashOnStart": {
+          "oneOf": [
+            { "enum": ["true", "false"] },
+            { "type": "boolean" }
+          ]
+        }
       }
     },
     "httpRoute": {

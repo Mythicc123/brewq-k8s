@@ -27,7 +27,7 @@ help:
 		'make smoke       Check the public menu, version and order endpoints' \
 		'make test        Run the in-cluster Helm smoke test' \
 		'make load-image  Load a local image tagged as IMAGE into kind' \
-		'make lint        Lint and validate the chart in four configurations' \
+		'make lint        Lint and validate the chart in multiple configurations' \
 		'make status      Show node, platform and app status' \
 		'make down        Delete the Brewq kind cluster'
 
@@ -84,12 +84,12 @@ test:
 lint:
 	helm lint $(CHART) --strict --kube-version 1.37.0
 	@set -e -o pipefail; for values in default autoscaling.enabled=false httpRoute.enabled=false \
-		'chaos.errorRate=0.3,chaos.latencyMs=400,chaos.leakMbPerMin=40,chaos.crashOnStart=true'; do \
+		'chaos.errorRate=0.3,chaos.latencyMs=400,chaos.leakMbPerMin=40,chaos.crashOnStart=true' \
+		'chaos.errorRate=0,chaos.latencyMs=0,chaos.leakMbPerMin=0,chaos.crashOnStart=false'; do \
 		printf '\nRendering %s\n' "$$values"; \
 		args=(); \
 		case "$$values" in \
 			default) ;; \
-			chaos.*) args=(--set-string "$$values") ;; \
 			*) args=(--set "$$values") ;; \
 		esac; \
 		helm template brewq $(CHART) --namespace brewq --kube-version 1.37.0 "$${args[@]}" | \

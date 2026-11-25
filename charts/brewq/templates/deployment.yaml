@@ -59,6 +59,11 @@ spec:
               value: {{ .Values.chaos.leakMbPerMin | quote }}
             - name: CHAOS_CRASH_ON_START
               value: {{ .Values.chaos.crashOnStart | quote }}
+          # Keep serving while Traefik processes the endpoint removal.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: 5
           startupProbe:
             httpGet:
               path: /healthz

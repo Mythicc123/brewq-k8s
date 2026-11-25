@@ -29,13 +29,13 @@ flowchart LR
 ## Prerequisites
 
 - Docker Desktop running on macOS, with local TCP port 80 available.
-- Bash, Make, curl, kind 0.33.0, Helm 4 and kubectl compatible with Kubernetes 1.37.
+- Bash, Make, curl, kind 0.33.0, Helm 4 and kubectl v1.37.0.
+  The kind configuration pins the Kubernetes v1.37.0 node image by digest.
 - kubeconform 0.8.0 for `make lint`.
 - Internet access for public charts, container images and `localtest.me` DNS.
 
-CI uses the published image `ghcr.io/mythicc123/brewq-service:0.1.0`.
-The image becomes available when repo 1 publishes its `v0.1.0` release.
-The `kind-e2e` job requires that release.
+The chart and the `kind-e2e` CI job use the published image
+`ghcr.io/mythicc123/brewq-service:0.1.0`.
 
 ## Quick start
 
@@ -43,14 +43,14 @@ The `kind-e2e` job requires that release.
 make up
 make deploy
 make smoke
-make down
+make test
 ```
 
 `make up` uses an existing `brewq` kind cluster if present. Helm and kubectl
 target the `kind-brewq` context and use the configured `KUBECONFIG`.
 `make smoke` checks the public menu and version routes and submits a sample order.
-Before tearing down, run `make status` to inspect the cluster or `make test` to
-check `/readyz` and `/menu` through the in-cluster Service.
+`make test` checks `/readyz` and `/menu` through the in-cluster Service.
+Run `make status` to inspect the cluster and `make down` when you finish using it.
 For a local service build, tag it as `ghcr.io/mythicc123/brewq-service:0.1.0`
 and run `make load-image` before `make deploy` on a fresh cluster.
 
@@ -74,7 +74,10 @@ The hostnames resolve to loopback. Every HTTPRoute attaches to
   [Kubernetes retirement announcement](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)
 - **Rollouts and disruption.** `maxUnavailable: 0` and `maxSurge: 1` keep
   ready pods serving while a replacement starts. The rollout needs space for
-  an extra pod. A PDB asks voluntary evictions to leave at least one pod
+  an extra pod. When a pod is removed, a five-second pre-stop hook keeps
+  the server available while Traefik picks up the endpoint change. The
+  20-second termination grace period also covers the server's ten-second
+  request drain. A PDB asks voluntary evictions to leave at least one pod
   available. Soft topology spread favours separate worker nodes when capacity allows.
 - **CPU and autoscaling.** The CPU request reserves capacity and gives the HPA
   a utilisation baseline. Omitting a CPU limit lets the service use spare CPU
