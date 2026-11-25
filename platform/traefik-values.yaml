@@ -1,3 +1,25 @@
+deployment:
+  replicas: 2
+
+# Keep one Gateway pod on each worker. With both workers occupied, replace
+# one pod at a time during a rollout so its replacement has room to schedule.
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: traefik
+        topologyKey: kubernetes.io/hostname
+
+updateStrategy:
+  rollingUpdate:
+    maxUnavailable: 1
+    maxSurge: 0
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
 providers:
   kubernetesCRD:
     enabled: false

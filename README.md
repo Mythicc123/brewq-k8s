@@ -39,6 +39,8 @@ The chart and the `kind-e2e` CI job use the published image
 
 ## Quick start
 
+For the manual Helm path, run:
+
 ```sh
 make up
 make deploy
@@ -48,8 +50,12 @@ make test
 
 `make up` uses an existing `brewq` kind cluster if present. Helm and kubectl
 target the `kind-brewq` context and use the configured `KUBECONFIG`.
+For GitOps, run `make up` on a fresh cluster and follow the
+[brewq-gitops quick start](https://github.com/Mythicc123/brewq-gitops#quick-start)
+to deploy Brewq through Argo CD.
 `make smoke` checks the public menu and version routes and submits a sample order.
-`make test` checks `/readyz` and `/menu` through the in-cluster Service.
+`make test` checks `/readyz` and `/menu` through the in-cluster Service
+on either deployment path.
 Run `make status` to inspect the cluster and `make down` when you finish using it.
 For a local service build, tag it as `ghcr.io/mythicc123/brewq-service:0.1.0`
 and run `make load-image` before `make deploy` on a fresh cluster.
@@ -70,6 +76,8 @@ The hostnames resolve to loopback. Every HTTPRoute attaches to
 ## Design decisions
 
 - **Gateway API.** Traefik serves one shared Gateway with a route per app.
+  Each worker hosts one Traefik replica. A disruption budget keeps one
+  Gateway replica available during a worker drain.
   Gateway API is the successor to Ingress, and Ingress NGINX was retired in March 2026.
   [Kubernetes retirement announcement](https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/)
 - **Rollouts and disruption.** `maxUnavailable: 0` and `maxSurge: 1` keep

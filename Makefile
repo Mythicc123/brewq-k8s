@@ -25,7 +25,7 @@ help:
 		'make up          Create the cluster and install the platform' \
 		'make deploy      Install or upgrade Brewq' \
 		'make smoke       Check the public menu, version and order endpoints' \
-		'make test        Run the in-cluster Helm smoke test' \
+		'make test        Run the in-cluster smoke test' \
 		'make load-image  Load a local image tagged as IMAGE into kind' \
 		'make lint        Lint and validate the chart in multiple configurations' \
 		'make status      Show node, platform and app status' \
@@ -79,7 +79,22 @@ smoke:
 		--data '{"name":"Sam","drink":"flat white"}'
 
 test:
-	$(HELM) test brewq -n brewq --logs --timeout $(TIMEOUT)
+	@# Argo CD renders the chart without recording a Helm release.
+	@set -e -o pipefail; \
+	release=$$($(HELM) list -n brewq --filter '^brewq$$' --short); \
+	if [[ -n "$$release" ]]; then \
+		$(HELM) test brewq -n brewq --logs --timeout $(TIMEOUT); \
+	else \
+		pod=$$($(HELM) template brewq $(CHART) -n brewq --show-only templates/tests/smoke.yaml | \
+			$(KUBECTL) -n brewq create -f - -o name); \
+		trap '$(KUBECTL) -n brewq delete "$$pod" --ignore-not-found' EXIT; \
+		$(KUBECTL) -n brewq wait "$$pod" --for='jsonpath={.status.phase}=Succeeded' --timeout=90s || { \
+			$(KUBECTL) -n brewq describe "$$pod"; \
+			$(KUBECTL) -n brewq logs "$$pod"; \
+			exit 1; \
+		}; \
+		$(KUBECTL) -n brewq logs "$$pod"; \
+	fi
 
 lint:
 	helm lint $(CHART) --strict --kube-version 1.37.0
