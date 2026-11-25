@@ -58,9 +58,5 @@ jobs:
           wait: 5m
       - run: make up
       - run: make deploy
-      - name: Wait for Traefik to accept the route
-        run: |
-          kubectl --context kind-brewq -n brewq wait httproute/brewq --timeout=60s \
-            --for='jsonpath={.status.parents[0].conditions[?(@.type=="Accepted")].status}=True'
       - run: make smoke
       - run: make test

@@ -50,10 +50,15 @@ make test
 
 `make up` uses an existing `brewq` kind cluster if present. Helm and kubectl
 target the `kind-brewq` context and use the configured `KUBECONFIG`.
+`make up` waits for the Traefik rollout and for the Gateway to report `Programmed`.
+`make deploy` waits for the Brewq rollout, a ready Service endpoint, and
+Traefik's `Accepted` and `ResolvedRefs` conditions when the HTTPRoute is enabled.
 For GitOps, run `make up` on a fresh cluster and follow the
 [brewq-gitops quick start](https://github.com/Mythicc123/brewq-gitops#quick-start)
 to deploy Brewq through Argo CD.
 `make smoke` checks the public menu and version routes and submits a sample order.
+It retries HTTP 503 and DNS or connect failures within a shared 60-second budget
+while Traefik updates its upstreams. Other errors fail immediately.
 `make test` checks `/readyz` and `/menu` through the in-cluster Service
 on either deployment path.
 Run `make status` to inspect the cluster and `make down` when you finish using it.

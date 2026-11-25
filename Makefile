@@ -45,6 +45,7 @@ up:
 	$(HELM) upgrade --install traefik traefik --repo $(TRAEFIK_REPO) \
 		--version $(TRAEFIK_VERSION) --skip-crds -f platform/traefik-values.yaml \
 		-n traefik --create-namespace --wait --timeout $(TIMEOUT)
+	$(KUBECTL) -n traefik rollout status deployment/traefik --timeout=$(TIMEOUT)
 	$(KUBECTL) apply -f platform/gateway.yaml
 	$(HELM) upgrade --install metrics-server metrics-server --repo $(METRICS_SERVER_REPO) \
 		--version $(METRICS_SERVER_VERSION) -f platform/metrics-server-values.yaml \
@@ -57,26 +58,35 @@ down:
 
 deploy:
 	$(HELM) upgrade --install brewq $(CHART) -n brewq --create-namespace --wait --timeout $(TIMEOUT)
+	$(KUBECTL) -n brewq rollout status deployment/brewq --timeout=$(TIMEOUT)
+	@set -e; \
+	generation=$$($(KUBECTL) -n brewq get httproute/brewq --ignore-not-found -o 'jsonpath={.metadata.generation}'); \
+	if [[ -n "$$generation" ]]; then \
+		parent='.status.parents[?(@.controllerName=="traefik.io/gateway-controller")]'; \
+		for type in Accepted ResolvedRefs; do \
+			condition="$$parent.conditions[?(@.type==\"$$type\")]"; \
+			$(KUBECTL) -n brewq wait httproute/brewq --timeout=60s \
+				--for="jsonpath={$$condition.observedGeneration}=$$generation" \
+				--for="jsonpath={$$condition.status}=True"; \
+		done; \
+	fi
+	@# The EndpointSlice controller publishes ready backends independently of the Deployment.
+	@set -e; deadline=$$((SECONDS + 60)); \
+	while (( SECONDS < deadline )); do \
+		ready=$$($(KUBECTL) -n brewq get endpointslices -l kubernetes.io/service-name=brewq \
+			--request-timeout=5s -o 'go-template={{range .items}}{{range .endpoints}}{{if .conditions.ready}}ready{{end}}{{end}}{{end}}'); \
+		if [[ -n "$$ready" ]]; then \
+			echo 'Brewq Service has a ready endpoint'; exit 0; \
+		fi; \
+		sleep 1; \
+	done; \
+	echo 'Timed out waiting for a ready Brewq Service endpoint' >&2; exit 1
 
 load-image:
 	kind load docker-image --name $(CLUSTER) "$(IMAGE)"
 
 smoke:
-	@set -e; request() { \
-		local path="$$1" response status; shift; \
-		response=$$(curl --silent --show-error --noproxy brewq.localtest.me --max-time 15 \
-			--write-out '\n%{http_code}' "$$@" "http://brewq.localtest.me$$path") || return; \
-		status=$${response##*$$'\n'}; \
-		printf '%s\n' "$${response%$$'\n'*}"; \
-		case "$$status" in \
-			2[0-9][0-9]) return 0 ;; \
-			*) printf '%s returned HTTP %s\n' "$$path" "$$status" >&2; return 1 ;; \
-		esac; \
-	}; \
-	request /menu; \
-	request /version; \
-	request /orders --request POST --header 'Content-Type: application/json' \
-		--data '{"name":"Sam","drink":"flat white"}'
+	@bash scripts/smoke.sh
 
 test:
 	@# Argo CD renders the chart without recording a Helm release.
